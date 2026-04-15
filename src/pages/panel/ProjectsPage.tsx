@@ -31,7 +31,12 @@ type GithubStatusRes = {
   login?: string | null;
   deployDefaultDomain?: string | null;
 };
-type GithubRepo = { full_name: string; default_branch: string; html_url: string };
+type GithubRepo = {
+  full_name: string;
+  name: string;
+  default_branch: string;
+  html_url: string;
+};
 type GithubReposRes = { ok?: boolean; repos: GithubRepo[] };
 type DeployTriggerRes = {
   ok?: boolean;
@@ -71,6 +76,14 @@ export function ProjectsPage() {
   });
   const [deploySaveBusy, setDeploySaveBusy] = useState(false);
   const [deployTriggerBusy, setDeployTriggerBusy] = useState(false);
+
+  const [createRepoQuery, setCreateRepoQuery] = useState("");
+  const [createRepoList, setCreateRepoList] = useState<GithubRepo[]>([]);
+  const [createReposBusy, setCreateReposBusy] = useState(false);
+  const [pendingGithubFullName, setPendingGithubFullName] = useState<string | null>(
+    null
+  );
+  const [autoLinkGithubOnCreate, setAutoLinkGithubOnCreate] = useState(true);
 
   const load = useCallback(async () => {
     const t = getToken();
@@ -119,6 +132,35 @@ export function ProjectsPage() {
     }, 320);
     return () => window.clearTimeout(id);
   }, [repoQuery, gh?.connected, deployOpenId]);
+
+  useEffect(() => {
+    const t = getToken();
+    if (!t || !gh?.connected) {
+      setCreateRepoList([]);
+      return;
+    }
+    const q = createRepoQuery.trim();
+    const id = window.setTimeout(() => {
+      setCreateReposBusy(true);
+      getJson<GithubReposRes>(`/api/yeppie/github/repos?page=1&q=${encodeURIComponent(q)}`, {
+        token: t,
+      })
+        .then((r) => setCreateRepoList(r.repos ?? []))
+        .catch(() => setCreateRepoList([]))
+        .finally(() => setCreateReposBusy(false));
+    }, 320);
+    return () => window.clearTimeout(id);
+  }, [createRepoQuery, gh?.connected]);
+
+  function applyCreateRepo(repo: GithubRepo) {
+    setPendingGithubFullName(repo.full_name);
+    setForm((f) => ({
+      ...f,
+      name: repo.name || repo.full_name.split("/")[1] || f.name,
+      repoUrl: repo.html_url,
+      branch: repo.default_branch || "main",
+    }));
+  }
 
   async function openDeploy(p: Project) {
     setDeployOpenId(p.id);
@@ -172,10 +214,37 @@ export function ProjectsPage() {
         },
         { token: t }
       );
-      if (res.project) {
-        setProjects((prev) => [res.project, ...prev]);
-        setForm(emptyForm());
+      if (!res.project) return;
+
+      let finalProject = res.project;
+      if (
+        pendingGithubFullName &&
+        autoLinkGithubOnCreate &&
+        gh?.connected
+      ) {
+        try {
+          const linked = await postJson<OneRes>(
+            `/api/yeppie/projects/${res.project.id}/github/link`,
+            {
+              repoFullName: pendingGithubFullName,
+              syncDefaultBranch: true,
+            },
+            { token: t }
+          );
+          if (linked.project) finalProject = linked.project;
+        } catch (err: unknown) {
+          setLoadErr(
+            err instanceof Error
+              ? `Проект создан, но GitHub: ${err.message}`
+              : "Проект создан, но не удалось привязать репозиторий"
+          );
+        }
       }
+
+      setProjects((prev) => [finalProject, ...prev]);
+      setForm(emptyForm());
+      setPendingGithubFullName(null);
+      setCreateRepoQuery("");
     } catch (err: unknown) {
       setLoadErr(err instanceof Error ? err.message : "Ошибка создания");
     } finally {
@@ -355,9 +424,90 @@ export function ProjectsPage() {
           Новый проект
         </h2>
         <p className="mt-1 text-[15px] text-[var(--color-yeppie-muted)]">
-          Карточка сервиса на VPS. Репозиторий и автодеплой настраиваются после
-          создания (GitHub в настройках панели).
+          Можно выбрать репозиторий из GitHub ниже — поля заполнятся сами; после
+          создания можно сразу создать webhook. Деплой на VPS — в карточке
+          проекта.
         </p>
+
+        {gh?.connected ? (
+          <div className="mt-4 rounded-xl border border-dashed border-[var(--color-yeppie-border)] bg-[var(--color-yeppie-surface)]/60 p-4">
+            <p className="text-sm font-medium text-[var(--color-yeppie-text)]">
+              Репозиторий из GitHub
+            </p>
+            <p className="mt-1 text-xs text-[var(--color-yeppie-muted)]">
+              Поиск и клик по строке — подставит название, URL и ветку по
+              умолчанию.
+            </p>
+            <input
+              value={createRepoQuery}
+              onChange={(e) => setCreateRepoQuery(e.target.value)}
+              className="mt-3 w-full rounded-lg border border-[var(--color-yeppie-border)] bg-[var(--color-yeppie-bg)] px-3 py-2 text-sm"
+              placeholder="Фильтр по имени…"
+              list="create-github-repos"
+            />
+            <datalist id="create-github-repos">
+              {createRepoList.map((r) => (
+                <option key={r.full_name} value={r.full_name} />
+              ))}
+            </datalist>
+            {createReposBusy ? (
+              <p className="mt-2 text-xs text-[var(--color-yeppie-muted)]">
+                Загрузка списка…
+              </p>
+            ) : null}
+            <ul className="mt-3 max-h-48 space-y-1 overflow-y-auto">
+              {createRepoList.map((r) => (
+                <li key={r.full_name}>
+                  <button
+                    type="button"
+                    onClick={() => applyCreateRepo(r)}
+                    className="w-full rounded-lg px-2 py-2 text-left text-sm text-[var(--color-yeppie-text)] hover:bg-white/80"
+                  >
+                    <span className="font-mono text-[13px]">{r.full_name}</span>
+                    <span className="ml-2 text-xs text-[var(--color-yeppie-muted)]">
+                      {r.default_branch}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+            {pendingGithubFullName ? (
+              <div className="mt-3 space-y-2 border-t border-[var(--color-yeppie-border)] pt-3">
+                <p className="text-xs text-[var(--color-yeppie-muted)]">
+                  Выбрано для привязки:{" "}
+                  <code className="text-[var(--color-yeppie-text)]">
+                    {pendingGithubFullName}
+                  </code>
+                </p>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={autoLinkGithubOnCreate}
+                    onChange={(e) =>
+                      setAutoLinkGithubOnCreate(e.target.checked)
+                    }
+                  />
+                  Создать webhook на GitHub после добавления проекта
+                </label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPendingGithubFullName(null);
+                  }}
+                  className="text-xs text-[var(--color-yeppie-muted)] underline"
+                >
+                  Сбросить выбор
+                </button>
+              </div>
+            ) : null}
+          </div>
+        ) : (
+          <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            Подключите GitHub в разделе «Настройки», чтобы выбирать репозиторий из
+            списка.
+          </p>
+        )}
+
         <form onSubmit={onCreate} className="mt-4 space-y-4">
           <label className="block text-sm font-medium text-[var(--color-yeppie-text)]">
             Название
@@ -374,9 +524,11 @@ export function ProjectsPage() {
             <input
               type="url"
               value={form.repoUrl}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, repoUrl: e.target.value }))
-              }
+              onChange={(e) => {
+                const v = e.target.value;
+                setForm((f) => ({ ...f, repoUrl: v }));
+                if (!v.trim()) setPendingGithubFullName(null);
+              }}
               className="mt-1.5 w-full rounded-xl border border-[var(--color-yeppie-border)] bg-[var(--color-yeppie-bg)] px-4 py-2.5 text-[15px] outline-none focus:border-[var(--color-yeppie-accent)] focus:ring-2 focus:ring-[rgba(196,92,58,0.25)]"
               placeholder="https://github.com/you/repo"
             />
