@@ -1,8 +1,28 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { LoginPage } from "./pages/LoginPage";
-import { PanelPage } from "./pages/PanelPage";
+import { PanelLayout } from "./layout/PanelLayout";
+import { DashboardPage } from "./pages/panel/DashboardPage";
+import { ProjectsPage } from "./pages/panel/ProjectsPage";
+import { SettingsPage } from "./pages/panel/SettingsPage";
 import { RequireAuth } from "./auth/RequireAuth";
 import { isLoginHost, isPanelHost, useSplitHosts } from "./auth/hosts";
+
+function panelRouteTree() {
+  return (
+    <Route
+      path="/panel"
+      element={
+        <RequireAuth>
+          <PanelLayout />
+        </RequireAuth>
+      }
+    >
+      <Route index element={<DashboardPage />} />
+      <Route path="projects" element={<ProjectsPage />} />
+      <Route path="settings" element={<SettingsPage />} />
+    </Route>
+  );
+}
 
 function AppRoutes() {
   const split = useSplitHosts();
@@ -11,14 +31,7 @@ function AppRoutes() {
     return (
       <Routes>
         <Route path="/" element={<LoginPage />} />
-        <Route
-          path="/panel"
-          element={
-            <RequireAuth>
-              <PanelPage />
-            </RequireAuth>
-          }
-        />
+        {panelRouteTree()}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     );
@@ -37,14 +50,7 @@ function AppRoutes() {
     return (
       <Routes>
         <Route path="/" element={<Navigate to="/panel" replace />} />
-        <Route
-          path="/panel"
-          element={
-            <RequireAuth>
-              <PanelPage />
-            </RequireAuth>
-          }
-        />
+        {panelRouteTree()}
         <Route path="*" element={<Navigate to="/panel" replace />} />
       </Routes>
     );
@@ -53,14 +59,7 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/" element={<LoginPage />} />
-      <Route
-        path="/panel"
-        element={
-          <RequireAuth>
-            <PanelPage />
-          </RequireAuth>
-        }
-      />
+      {panelRouteTree()}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
