@@ -30,7 +30,18 @@ type GithubStatusRes = {
   connected?: boolean;
   login?: string | null;
   deployDefaultDomain?: string | null;
+  /** Шаблон URL с `{projectId}` — из YEPPIE_DEPLOY_HOOK_URL_TEMPLATE на API */
+  deployHookUrlTemplate?: string | null;
 };
+
+function slugifySubdomain(name: string): string {
+  const s = name
+    .toLowerCase()
+    .replace(/[^a-z0-9-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60);
+  return s || "app";
+}
 type GithubRepo = {
   full_name: string;
   name: string;
@@ -182,10 +193,16 @@ export function ProjectsPage() {
       }
     }
     setLinkRepoInput(proj.githubRepoFullName ?? "");
+    const tpl = gh?.deployHookUrlTemplate?.trim();
+    const hookFromTemplate =
+      tpl && !proj.deployHookUrl?.trim()
+        ? tpl.replace(/\{projectId\}/g, String(proj.id))
+        : "";
     setDeployForm({
-      deploySubdomain: proj.deploySubdomain ?? "",
+      deploySubdomain:
+        proj.deploySubdomain?.trim() ?? slugifySubdomain(proj.name),
       deployBaseDomain: proj.deployBaseDomain ?? "",
-      deployHookUrl: proj.deployHookUrl ?? "",
+      deployHookUrl: proj.deployHookUrl?.trim() ?? hookFromTemplate,
       autoDeployEnabled: Boolean(proj.autoDeployEnabled),
     });
     setRepoQuery("");
