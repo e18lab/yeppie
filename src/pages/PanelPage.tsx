@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { postJson } from "../api/client";
 import { clearToken, getToken } from "../auth/token";
+import { isPanelHost, loginOrigin, useSplitHosts } from "../auth/hosts";
 
 export function PanelPage() {
   const navigate = useNavigate();
@@ -16,7 +17,11 @@ export function PanelPage() {
       }
     }
     clearToken();
-    navigate("/", { replace: true });
+    if (useSplitHosts() && isPanelHost()) {
+      window.location.href = `${loginOrigin()}/`;
+    } else {
+      navigate("/", { replace: true });
+    }
   }
 
   return (

@@ -2,13 +2,19 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { postJson } from "../api/client";
 import { getToken, setToken } from "../auth/token";
+import { isLoginHost, panelOrigin, useSplitHosts } from "../auth/hosts";
 
 type LoginRes = { ok: boolean; token: string; expiresAt: string };
 
 export function LoginPage() {
   const navigate = useNavigate();
   useEffect(() => {
-    if (getToken()) navigate("/panel", { replace: true });
+    if (!getToken()) return;
+    if (useSplitHosts() && isLoginHost()) {
+      window.location.href = `${panelOrigin()}/panel`;
+    } else {
+      navigate("/panel", { replace: true });
+    }
   }, [navigate]);
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -24,7 +30,11 @@ export function LoginPage() {
       });
       if (res.token) {
         setToken(res.token);
-        navigate("/panel", { replace: true });
+        if (useSplitHosts() && isLoginHost()) {
+          window.location.href = `${panelOrigin()}/panel`;
+        } else {
+          navigate("/panel", { replace: true });
+        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Ошибка входа");
