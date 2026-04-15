@@ -18,16 +18,14 @@ function readCookie(name: string): string | null {
   return m?.[1] ? decodeURIComponent(m[1]) : null;
 }
 
+/**
+ * На проде (.maks1mio.su) сессия только в cookie (Domain=.maks1mio.su).
+ * Не читаем localStorage: на apex он есть, на panel.yeppie — нет → редирект по кругу.
+ */
 export function getToken(): string | null {
   const domain = cookieDomain();
   if (domain) {
-    const fromCookie = readCookie(KEY);
-    if (fromCookie) return fromCookie;
-    try {
-      return localStorage.getItem(KEY);
-    } catch {
-      return null;
-    }
+    return readCookie(KEY);
   }
   try {
     return localStorage.getItem(KEY);
