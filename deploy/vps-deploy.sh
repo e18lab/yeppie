@@ -17,6 +17,12 @@ fi
 git checkout main
 git reset --hard origin/main
 
+# Lockfile в формате Yarn 1. Глобальный Yarn 4 даёт YN0028 с --immutable/--frozen-lockfile.
+# package.json: "packageManager": "yarn@1.22.22" + corepack → ставим Yarn Classic.
+if command -v corepack >/dev/null 2>&1; then
+  corepack enable >/dev/null 2>&1 || true
+  corepack prepare yarn@1.22.22 --activate >/dev/null 2>&1 || true
+fi
 yarn install --frozen-lockfile
 
 if [ ! -f .env ] && [ ! -f .env.production ]; then

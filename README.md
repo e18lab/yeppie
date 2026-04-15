@@ -1,3 +1,11 @@
+# Yeppie
+
+Панель (React + Vite). На VPS используется **Yarn 1** (`packageManager` в `package.json`). Если на сервере стоит **Yarn 4**, перед `yarn install` выполни: `corepack enable && corepack prepare yarn@1.22.22 --activate`.
+
+Деплой: см. `deploy/vps-deploy.sh`, PM2 — `ecosystem.config.cjs`.
+
+---
+
 # React + TypeScript + Vite
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
