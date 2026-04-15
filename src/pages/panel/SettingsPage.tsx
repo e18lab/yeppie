@@ -11,6 +11,17 @@ type GithubStatus = {
   login?: string | null;
 };
 
+type DiagnoseResult = {
+  ok?: boolean;
+  githubLogin?: string | null;
+  oauthScopes?: string | null;
+  repoFullName?: string | null;
+  listFirst100ContainsRepo?: boolean | null;
+  repoGetStatus?: number | null;
+  repoGetMessage?: string | null;
+  hints?: string[];
+};
+
 export function SettingsPage() {
   const split = useSplitHosts();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -22,6 +33,11 @@ export function SettingsPage() {
   const [hint, setHint] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [banner, setBanner] = useState<string | null>(null);
+  const [diagnoseRepo, setDiagnoseRepo] = useState("e18lab/multporn-api-sdk");
+  const [diagBusy, setDiagBusy] = useState(false);
+  const [diagnoseResult, setDiagnoseResult] = useState<DiagnoseResult | null>(
+    null
+  );
 
   useEffect(() => {
     const g = searchParams.get("github");
@@ -93,6 +109,27 @@ export function SettingsPage() {
     }
   }
 
+  async function runDiagnose() {
+    const t = getToken();
+    if (!t) return;
+    setDiagBusy(true);
+    setDiagnoseResult(null);
+    try {
+      const q = diagnoseRepo.trim();
+      const path =
+        `/api/yeppie/github/diagnose` + (q ? `?repo=${encodeURIComponent(q)}` : "");
+      const res = await getJson<DiagnoseResult>(path, { token: t });
+      setDiagnoseResult(res);
+    } catch (e: unknown) {
+      setDiagnoseResult({
+        ok: false,
+        hints: [e instanceof Error ? e.message : "Ошибка запроса"],
+      });
+    } finally {
+      setDiagBusy(false);
+    }
+  }
+
   const cardClass =
     "rounded-2xl border border-[var(--color-yeppie-border)] bg-white/90 p-6 shadow-[0_1px_1px_rgba(0,0,0,0.04)]";
 
@@ -153,6 +190,48 @@ export function SettingsPage() {
             </button>
           ) : null}
         </div>
+
+        {gh?.connected ? (
+          <div className="mt-6 border-t border-[var(--color-yeppie-border)] pt-4">
+            <h3 className="text-sm font-medium text-[var(--color-yeppie-text)]">
+              Диагностика доступа к репозиторию
+            </h3>
+            <p className="mt-1 text-xs text-[var(--color-yeppie-muted)]">
+              Сравниваем ответы GitHub API. Если репо есть в списке, а прямой
+              запрос даёт 404 — часто не настроен SAML SSO для OAuth-токена.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <input
+                value={diagnoseRepo}
+                onChange={(e) => setDiagnoseRepo(e.target.value)}
+                className="min-w-[200px] flex-1 rounded-lg border border-[var(--color-yeppie-border)] bg-[var(--color-yeppie-bg)] px-3 py-2 text-sm font-mono"
+                placeholder="owner/repo"
+              />
+              <button
+                type="button"
+                disabled={diagBusy}
+                onClick={() => void runDiagnose()}
+                className="rounded-xl border border-[var(--color-yeppie-border)] bg-[var(--color-yeppie-surface)] px-4 py-2 text-sm"
+              >
+                {diagBusy ? "Проверка…" : "Проверить"}
+              </button>
+            </div>
+            {diagnoseResult ? (
+              <div className="mt-3 space-y-2">
+                {diagnoseResult.hints?.length ? (
+                  <ul className="list-inside list-disc text-sm text-amber-900">
+                    {diagnoseResult.hints.map((h, i) => (
+                      <li key={i}>{h}</li>
+                    ))}
+                  </ul>
+                ) : null}
+                <pre className="max-h-56 overflow-auto rounded-lg bg-[var(--color-yeppie-surface)] p-3 text-[11px] leading-relaxed">
+                  {JSON.stringify(diagnoseResult, null, 2)}
+                </pre>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
       </div>
 
       <div className={cardClass}>
