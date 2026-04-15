@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { postJson } from "../api/client";
 import { getToken, setToken } from "../auth/token";
@@ -8,10 +8,13 @@ type LoginRes = { ok: boolean; token: string; expiresAt: string };
 
 export function LoginPage() {
   const navigate = useNavigate();
+  const didCheck = useRef(false);
   useEffect(() => {
+    if (didCheck.current) return;
+    didCheck.current = true;
     if (!getToken()) return;
     if (useSplitHosts() && isLoginHost()) {
-      window.location.href = `${panelOrigin()}/panel`;
+      window.location.replace(`${panelOrigin()}/panel`);
     } else {
       navigate("/panel", { replace: true });
     }

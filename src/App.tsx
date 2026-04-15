@@ -1,25 +1,8 @@
-import type { ReactNode } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { LoginPage } from "./pages/LoginPage";
 import { PanelPage } from "./pages/PanelPage";
-import { getToken, redirectToLogin } from "./auth/token";
+import { RequireAuth } from "./auth/RequireAuth";
 import { isLoginHost, isPanelHost, useSplitHosts } from "./auth/hosts";
-
-function RequireAuth({ children }: { children: ReactNode }) {
-  const t = getToken();
-  if (!t) {
-    if (isPanelHost()) {
-      redirectToLogin();
-      return (
-        <p className="p-8 text-center text-[var(--color-yeppie-muted)]">
-          Перенаправление на вход…
-        </p>
-      );
-    }
-    return <Navigate to="/" replace />;
-  }
-  return <>{children}</>;
-}
 
 function AppRoutes() {
   const split = useSplitHosts();

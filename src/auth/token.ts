@@ -11,15 +11,18 @@ function cookieDomain(): string | null {
   return null;
 }
 
+function readCookie(name: string): string | null {
+  const m = document.cookie.match(
+    new RegExp(`(?:^|;\\s*)${name}=([^;]*)`)
+  );
+  return m?.[1] ? decodeURIComponent(m[1]) : null;
+}
+
 export function getToken(): string | null {
   const domain = cookieDomain();
   if (domain) {
-    const raw = `; ${document.cookie}`;
-    const parts = raw.split(`; ${KEY}=`);
-    if (parts.length === 2) {
-      const v = parts.pop()?.split(";").shift();
-      if (v) return decodeURIComponent(v);
-    }
+    const fromCookie = readCookie(KEY);
+    if (fromCookie) return fromCookie;
     try {
       return localStorage.getItem(KEY);
     } catch {
@@ -38,7 +41,8 @@ export function setToken(token: string): void {
   if (domain) {
     const maxAge = 60 * 60 * 24 * 30;
     const secure = window.location.protocol === "https:" ? "; Secure" : "";
-    document.cookie = `${KEY}=${encodeURIComponent(token)}; Path=/; Domain=${domain}; Max-Age=${maxAge}; SameSite=Lax${secure}`;
+    // Lax иногда режет переход apex → поддомен в SPA; None+Secure для общего домена
+    document.cookie = `${KEY}=${encodeURIComponent(token)}; Path=/; Domain=${domain}; Max-Age=${maxAge}; SameSite=None${secure}`;
     try {
       localStorage.removeItem(KEY);
     } catch {
@@ -53,7 +57,7 @@ export function clearToken(): void {
   const domain = cookieDomain();
   if (domain) {
     const secure = window.location.protocol === "https:" ? "; Secure" : "";
-    document.cookie = `${KEY}=; Path=/; Domain=${domain}; Max-Age=0; SameSite=Lax${secure}`;
+    document.cookie = `${KEY}=; Path=/; Domain=${domain}; Max-Age=0; SameSite=None${secure}`;
   }
   try {
     localStorage.removeItem(KEY);
